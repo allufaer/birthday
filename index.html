@@ -749,7 +749,7 @@
 <!-- ================= 3. 视频1 ================= -->
 <div id="video1-stage" class="stage">
   <div class="video-container">
-    <video id="video1" playsinline controls muted preload="auto"></video>
+    <video id="video1" playsinline controls muted preload="metadata"></video>
   </div>
 </div>
 
@@ -820,7 +820,7 @@
 <!-- ================= 7.6. 通关视频 ================= -->
 <div id="video-mid-stage" class="stage">
   <div class="video-container">
-    <video id="videoMid" playsinline controls muted></video>
+    <video id="videoMid" playsinline controls muted preload="metadata"></video>
   </div>
 </div>
 
@@ -897,14 +897,6 @@
   let isGame1Active = false;
   let animFrameId = null;
 
-  // 媒体加载：通过 fetch + Blob URL 绕过 solo-remote-file 协议不支持 Range 的问题
-  function loadMediaBlob(url) {
-    return fetch(url).then(res => res.blob()).then(blob => URL.createObjectURL(blob)).catch(e => {
-      console.warn('Blob加载失败，回退原URL:', url, e);
-      return url;
-    });
-  }
-
   // 音频（请替换为你自己的音频路径）
   const dogAudio = new Audio();
   const bigDogAudio = new Audio();
@@ -912,12 +904,14 @@
   const prisonMusic = new Audio();
   const birthdaySong = new Audio();
   const searchEndSound = new Audio();
-  loadMediaBlob('dagou.mp3').then(u => dogAudio.src = u);
-  loadMediaBlob('big_bark.mp3').then(u => bigDogAudio.src = u);
-  loadMediaBlob('.uploads/33cfd9f1-eedd-479a-9867-b5c8c6d5a47e_LINE - 永远的奥特曼.mp3').then(u => ultramanMusic.src = u);
-  loadMediaBlob('.uploads/49db2c1e-5518-4b35-bbb3-cd119e4756fb_北北昼,北昼 - 囚笼.mp3').then(u => prisonMusic.src = u);
-  loadMediaBlob('.uploads/d5931e39-5947-41cb-a662-10c649310e5e_yihuik苡慧 - 生日快乐.mp3').then(u => birthdaySong.src = u);
-  loadMediaBlob('.uploads/50d987eb-8094-4cd1-aa98-c188699fffbb_audio (5).mp3').then(u => searchEndSound.src = u);
+  [dogAudio, bigDogAudio, ultramanMusic, prisonMusic, birthdaySong, searchEndSound]
+    .forEach(audio => { audio.preload = 'none'; });
+  dogAudio.src = 'dagou.mp3';
+  bigDogAudio.src = 'big_bark.mp3';
+  ultramanMusic.src = '.uploads/33cfd9f1-eedd-479a-9867-b5c8c6d5a47e_LINE - 永远的奥特曼.mp3';
+  prisonMusic.src = '.uploads/49db2c1e-5518-4b35-bbb3-cd119e4756fb_北北昼,北昼 - 囚笼.mp3';
+  birthdaySong.src = '.uploads/d5931e39-5947-41cb-a662-10c649310e5e_yihuik苡慧 - 生日快乐.mp3';
+  searchEndSound.src = '.uploads/50d987eb-8094-4cd1-aa98-c188699fffbb_audio (5).mp3';
 
   // ================= 核心舞台切换函数 =================
   function showStage(stageId) {
@@ -1027,31 +1021,20 @@
   }
 
   // ================= 3. 视频逻辑 =================
-  // 预加载视频 Blob URL
+  // 使用原始媒体地址，让浏览器按需流式加载视频
+  const VIDEO1 = 'video1.mp4';
   const MID_VIDEO = '.uploads/9e473f9e-367d-4f76-9407-29a8f5f9887e_1582f10bec332e84a0fcf4ed0c3eb2b3.mp4';
-  let video1BlobUrl = null, videoMidBlobUrl = null;
-  loadMediaBlob('video1.mp4').then(u => { video1BlobUrl = u; });
-  loadMediaBlob(MID_VIDEO).then(u => { videoMidBlobUrl = u; });
 
   function playVideo1() {
     const video = document.getElementById('video1');
     const startPlay = () => {
       video.pause();
-      video.currentTime = 0;
       video.play().then(() => {
         video.muted = false;
       }).catch(e => console.log("视频自动播放被拦截，请点击播放按钮:", e));
     };
-    if (video1BlobUrl) {
-      video.src = video1BlobUrl;
-      startPlay();
-    } else {
-      loadMediaBlob('video1.mp4').then(u => {
-        video1BlobUrl = u;
-        video.src = u;
-        startPlay();
-      });
-    }
+    video.src = VIDEO1;
+    startPlay();
     video.onended = () => {
       fadeToBlack(() => {
         showStage('vn1-stage');
@@ -1069,22 +1052,13 @@
       const video = document.getElementById('videoMid');
       const startPlay = () => {
         video.pause();
-        video.currentTime = 0;
         video.volume = 0.4; // 视频音量小一些
         video.play().then(() => {
           video.muted = false;
         }).catch(e => console.log("通关视频播放失败:", e));
       };
-      if (videoMidBlobUrl) {
-        video.src = videoMidBlobUrl;
-        startPlay();
-      } else {
-        loadMediaBlob(MID_VIDEO).then(u => {
-          videoMidBlobUrl = u;
-          video.src = u;
-          startPlay();
-        });
-      }
+      video.src = MID_VIDEO;
+      startPlay();
       video.onended = () => {
         fadeToBlack(() => {
           showStage('vn3-stage');
@@ -1450,9 +1424,9 @@
     if (name && !playedSongs.includes(name)) playedSongs.push(name);
   }
 
-  // 使用 Blob URL 加载背景音乐
-  loadMediaBlob('frankenstein.mp3').then(u => { bgMusic.src = u; });
-  loadMediaBlob('bgm2.mp3').then(u => { bgMusic2.src = u; });
+  // 使用原始媒体地址，让浏览器按需流式加载背景音乐
+  bgMusic.src = 'frankenstein.mp3';
+  bgMusic2.src = 'bgm2.mp3';
 
   // 低音量（稍微调小）
   bgMusic.volume = 0.08;
@@ -1526,12 +1500,7 @@
       bgMusic.play().catch(e => console.warn("静音自动播放失败:", e));
     });
   }
-  // 等待 Blob URL 加载完成后再尝试播放
-  if (bgMusic.src && bgMusic.src.startsWith('blob:')) {
-    tryAutoplay();
-  } else {
-    bgMusic.addEventListener('loadedmetadata', tryAutoplay, { once: true });
-  }
+  tryAutoplay();
 
   // ================= 礼物盒 + 搜索动画（三角洲风格） =================
   const SEARCH_CONFIGS = [
