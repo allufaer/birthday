@@ -678,8 +678,8 @@
 <!-- 全局黑屏遮罩 -->
 <div id="black-screen"></div>
 
-<!-- 全局背景音乐 —— 优先有声自动播放，被拦截时静音播放，首次交互后取消静音 -->
-<audio id="bgMusic" loop preload="auto"></audio>
+<!-- 全局背景音乐 —— 页面加载时自动播放；浏览器拦截有声播放时静音播放，首次交互后取消静音 -->
+<audio id="bgMusic" loop preload="auto" autoplay></audio>
 <audio id="bgMusic2" loop preload="auto"></audio>
 <button class="music-toggle" id="musicToggle" onclick="toggleMusic()">🎵</button>
 
@@ -1496,26 +1496,34 @@
     }
   }
 
-  // 优先有声自动播放；被浏览器拦截时，改为静音播放，首次交互后取消静音
+  // 页面加载时优先有声自动播放；被浏览器拦截时改为静音播放，首次交互后取消静音
   function tryAutoplay() {
+    let userInteracted = false;
+    const tryUnmute = () => {
+      userInteracted = true;
+      const active = getActiveAudio();
+      active.muted = false;
+      active.volume = active === bgMusic2 ? 0.05 : 0.08;
+      if (active.paused) {
+        active.play().then(() => {
+          if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
+        }).catch(e => console.warn("用户交互后播放音乐失败:", e));
+      }
+      document.removeEventListener('pointerdown', tryUnmute, true);
+      document.removeEventListener('keydown', tryUnmute, true);
+      document.removeEventListener('touchstart', tryUnmute, true);
+    };
+    document.addEventListener('pointerdown', tryUnmute, true);
+    document.addEventListener('keydown', tryUnmute, true);
+    document.addEventListener('touchstart', tryUnmute, true);
+
     bgMusic.play().then(() => {
       markPlayed('背景音乐 · Frankenstein');
       console.log("音乐自动播放成功");
     }).catch(() => {
+      if (userInteracted) return;
       bgMusic.muted = true;
-      bgMusic.play().catch(() => {});
-      const tryUnmute = () => {
-        const active = getActiveAudio();
-        active.muted = false;
-        active.volume = active === bgMusic2 ? 0.05 : 0.08;
-        if (active.paused) active.play().catch(() => {});
-        document.removeEventListener('click', tryUnmute);
-        document.removeEventListener('keydown', tryUnmute);
-        document.removeEventListener('touchstart', tryUnmute);
-      };
-      document.addEventListener('click', tryUnmute);
-      document.addEventListener('keydown', tryUnmute);
-      document.addEventListener('touchstart', tryUnmute);
+      bgMusic.play().catch(e => console.warn("静音自动播放失败:", e));
     });
   }
   // 等待 Blob URL 加载完成后再尝试播放
