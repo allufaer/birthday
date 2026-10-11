@@ -998,6 +998,12 @@
   }
 
   function triggerFlipTransition() {
+    // 利用翻页和黑屏转场时间提前缓冲视频，缩短进入视频后的等待。
+    const video = document.getElementById('video1');
+    video.preload = 'auto';
+    video.src = VIDEO1;
+    video.load();
+
     showStage('flip-stage');
     const flipPaper = document.getElementById('flipPaper');
     const blackScreen = document.getElementById('black-screen');
@@ -1031,7 +1037,6 @@
         video.muted = false;
       }).catch(e => console.log("视频自动播放被拦截，请点击播放按钮:", e));
     };
-    video.src = VIDEO1;
     startPlay();
     video.onended = () => {
       fadeToBlack(() => {
