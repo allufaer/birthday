@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>奶蛙营救记 | 生日特别版</title>
+<!-- 引入烟花库 -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
   /* ================= 基础重置 ================= */
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Microsoft YaHei', sans-serif; user-select: none; }
@@ -676,15 +678,14 @@
 <!-- 全局黑屏遮罩 -->
 <div id="black-screen"></div>
 
-<!-- 全局背景音乐 —— 页面加载时自动播放；浏览器拦截有声播放时静音播放，首次交互后取消静音 -->
-<audio id="bgMusic" loop preload="auto" autoplay></audio>
-<audio id="bgMusic2" loop preload="none"></audio>
+<!-- 全局背景音乐 —— 优先有声自动播放，被拦截时静音播放，首次交互后取消静音 -->
+<audio id="bgMusic" loop preload="auto"></audio>
 <button class="music-toggle" id="musicToggle" onclick="toggleMusic()">🎵</button>
 
 <!-- 密码错误温馨弹窗 -->
 <div class="error-overlay" id="errorOverlay">
   <div class="error-card">
-    <img src="error-img.jpg" alt="温馨提示" loading="lazy">
+    <img src="error-img.jpg" alt="温馨提示">
     <div class="error-card-body">
       <h2>密码不对哦～</h2>
       <p>再想想今天是什么日子吧？<br>提示：月+日，4位数字<br>（比如1月1日就是 0101）</p>
@@ -747,14 +748,14 @@
 <!-- ================= 3. 视频1 ================= -->
 <div id="video1-stage" class="stage">
   <div class="video-container">
-    <video id="video1" playsinline controls muted preload="none"></video>
+    <video id="video1" playsinline controls muted preload="auto"></video>
   </div>
 </div>
 
 <!-- ================= 4. 奶蛙开场剧情 ================= -->
 <div id="vn1-stage" class="stage">
   <div class="vn-background" style="background-image: url('bg1.jpg');"></div>
-  <img class="vn-character" src="character.png" alt="奶娃骑士" loading="lazy">
+  <img class="vn-character" src="character.png" alt="奶娃骑士">
   <div class="vn-dialog-box">
     <div class="vn-name-tag">奶娃骑士</div>
     <div class="vn-text">糟了！小白手套抓走了奶蛙！愿意和我一起营救吗？</div>
@@ -770,7 +771,7 @@
   <div class="game-header">🐕 请让大狗叫（连续点击5次！）</div>
   <!-- 大狗图片（外层为点击判定区，内层为圆形图片） -->
   <div id="dogHitbox">
-    <img id="dogImage" alt="大狗" draggable="false">
+    <img id="dogImage" src="https://placehold.co/150x150/orange/white?text=大狗" alt="大狗" draggable="false">
   </div>
   <!-- 屏幕变白遮罩 -->
   <div id="whiteOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #f5f5f5; opacity: 0; pointer-events: none; z-index: 100; transition: opacity 2s ease;"></div>
@@ -779,7 +780,7 @@
 <!-- ================= 6. 过渡剧情2（幻术与闪身步） ================= -->
 <div id="vn2-stage" class="stage">
   <div class="vn-background" style="background-image: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop');"></div>
-  <img class="vn-character" src="character.png" alt="奶娃骑士" loading="lazy">
+  <img class="vn-character" src="character.png" alt="奶娃骑士">
   <div class="vn-dialog-box" style="bottom: auto; top: 16%;">
     <div class="vn-name-tag">奶娃骑士</div>
     <div class="vn-text">小白手套设计了幻阵，我们得用闪身步，规矩立住，这样路才能走宽</div>
@@ -818,7 +819,7 @@
 <!-- ================= 7.6. 通关视频 ================= -->
 <div id="video-mid-stage" class="stage">
   <div class="video-container">
-    <video id="videoMid" playsinline controls muted preload="none"></video>
+    <video id="videoMid" playsinline controls muted></video>
   </div>
 </div>
 
@@ -895,21 +896,34 @@
   let isGame1Active = false;
   let animFrameId = null;
 
-  // 音频（请替换为你自己的音频路径）
+  // 媒体加载：通过 fetch + Blob URL 绕过 solo-remote-file 协议不支持 Range 的问题
+  function loadMediaBlob(url) {
+    return fetch(url).then(res => res.blob()).then(blob => URL.createObjectURL(blob)).catch(e => {
+      console.warn('Blob加载失败，回退原URL:', url, e);
+      return url;
+    });
+  }
+
+  // 按需加载：记录已加载的媒体，避免重复 fetch
+  const _loadedMedia = new Set();
+  function ensureMedia(audioEl, url) {
+    if (_loadedMedia.has(url)) return;
+    _loadedMedia.add(url);
+    loadMediaBlob(url).then(u => { audioEl.src = u; });
+  }
+  function ensureVideo(urlVar, url) {
+    if (_loadedMedia.has(url)) return;
+    _loadedMedia.add(url);
+    loadMediaBlob(url).then(u => { window[urlVar] = u; });
+  }
+
+  // 音频元素（按需加载，不在页面打开时全部下载）
   const dogAudio = new Audio();
   const bigDogAudio = new Audio();
   const ultramanMusic = new Audio();
   const prisonMusic = new Audio();
   const birthdaySong = new Audio();
   const searchEndSound = new Audio();
-  [dogAudio, bigDogAudio, ultramanMusic, prisonMusic, birthdaySong, searchEndSound]
-    .forEach(audio => { audio.preload = 'none'; });
-  dogAudio.src = 'dagou.mp3';
-  bigDogAudio.src = 'big_bark.mp3';
-  ultramanMusic.src = '.uploads/33cfd9f1-eedd-479a-9867-b5c8c6d5a47e_LINE - 永远的奥特曼.mp3';
-  prisonMusic.src = '.uploads/49db2c1e-5518-4b35-bbb3-cd119e4756fb_北北昼,北昼 - 囚笼.mp3';
-  birthdaySong.src = '.uploads/d5931e39-5947-41cb-a662-10c649310e5e_yihuik苡慧 - 生日快乐.mp3';
-  searchEndSound.src = '.uploads/50d987eb-8094-4cd1-aa98-c188699fffbb_audio (5).mp3';
 
   // ================= 核心舞台切换函数 =================
   function showStage(stageId) {
@@ -976,34 +990,9 @@
     requestAnimationFrame(step);
   }
 
-  // 切换背景音乐：淡出当前，淡入新的
-  function switchMusic(fromAudio, toAudio, fadeDuration) {
-    fadeOutMusic(fadeDuration, fromAudio);
-    toAudio.volume = 0;
-    toAudio.muted = false;
-    toAudio.play().then(() => {
-      if (toAudio === bgMusic2) markPlayed('背景音乐 2');
-      // 淡入
-      const startTime = Date.now();
-      const targetVol = 0.05;
-      const fadeIn = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / fadeDuration, 1);
-        toAudio.volume = targetVol * progress;
-        if (progress < 1) requestAnimationFrame(fadeIn);
-        else toAudio.volume = targetVol;
-      };
-      requestAnimationFrame(fadeIn);
-    }).catch(() => {});
-  }
-
   function triggerFlipTransition() {
-    // 利用翻页和黑屏转场时间提前缓冲视频，缩短进入视频后的等待。
-    const video = document.getElementById('video1');
-    video.preload = 'auto';
-    video.src = VIDEO1;
-    video.load();
-
+    // 预加载：第一段视频（翻页动画期间后台下载）
+    if (!video1BlobUrl) loadMediaBlob('video1.mp4').then(u => { video1BlobUrl = u; });
     showStage('flip-stage');
     const flipPaper = document.getElementById('flipPaper');
     const blackScreen = document.getElementById('black-screen');
@@ -1025,28 +1014,45 @@
   }
 
   // ================= 3. 视频逻辑 =================
-  // 使用原始媒体地址，让浏览器按需流式加载视频
-  const VIDEO1 = 'video1.mp4';
+  // 视频按需加载（不在页面打开时下载）
   const MID_VIDEO = '.uploads/9e473f9e-367d-4f76-9407-29a8f5f9887e_1582f10bec332e84a0fcf4ed0c3eb2b3.mp4';
+  let video1BlobUrl = null, videoMidBlobUrl = null;
 
   function playVideo1() {
     const video = document.getElementById('video1');
     const startPlay = () => {
       video.pause();
+      video.currentTime = 0;
       video.play().then(() => {
         video.muted = false;
       }).catch(e => console.log("视频自动播放被拦截，请点击播放按钮:", e));
     };
-    startPlay();
+    if (video1BlobUrl) {
+      video.src = video1BlobUrl;
+      startPlay();
+    } else {
+      loadMediaBlob('video1.mp4').then(u => {
+        video1BlobUrl = u;
+        video.src = u;
+        startPlay();
+      });
+    }
     video.onended = () => {
       fadeToBlack(() => {
         showStage('vn1-stage');
-        switchMusic(bgMusic, bgMusic2, 1500);
+        // 视频结束后继续播放背景音乐
+        bgMusic.currentTime = 0;
+        bgMusic.volume = 0.08;
+        bgMusic.play().catch(() => {});
+        updateMusicBtn();
       });
     };
   }
 
   function playVideoMid() {
+    // 预加载：生日歌 + 搜索结束音效（通关视频播放期间后台下载）
+    ensureMedia(birthdaySong, '.uploads/d5931e39-5947-41cb-a662-10c649310e5e_yihuik苡慧 - 生日快乐.mp3');
+    ensureMedia(searchEndSound, '.uploads/50d987eb-8094-4cd1-aa98-c188699fffbb_audio (5).mp3');
     // 囚笼音乐慢慢变小至消失
     fadeOutMusic(1500, prisonMusic);
     // 画面慢慢变黑
@@ -1055,13 +1061,22 @@
       const video = document.getElementById('videoMid');
       const startPlay = () => {
         video.pause();
+        video.currentTime = 0;
         video.volume = 0.4; // 视频音量小一些
         video.play().then(() => {
           video.muted = false;
         }).catch(e => console.log("通关视频播放失败:", e));
       };
-      video.src = MID_VIDEO;
-      startPlay();
+      if (videoMidBlobUrl) {
+        video.src = videoMidBlobUrl;
+        startPlay();
+      } else {
+        loadMediaBlob(MID_VIDEO).then(u => {
+          videoMidBlobUrl = u;
+          video.src = u;
+          startPlay();
+        });
+      }
       video.onended = () => {
         fadeToBlack(() => {
           showStage('vn3-stage');
@@ -1079,10 +1094,14 @@
 
   // ================= 4. 小游戏1：魔性大狗点击战 =================
   function startGame1() {
-    // 第一次对话框结束：黑屏缓缓出现，第二首音乐渐弱至消失
+    // 按需加载：狗叫音效 + 预加载奥特曼音乐
+    ensureMedia(dogAudio, 'dagou.mp3');
+    ensureMedia(bigDogAudio, 'big_bark.mp3');
+    ensureMedia(ultramanMusic, '.uploads/33cfd9f1-eedd-479a-9867-b5c8c6d5a47e_LINE - 永远的奥特曼.mp3');
+    // 第一次对话框结束：黑屏缓缓出现，背景音乐渐弱至消失
     const blackScreen = document.getElementById('black-screen');
     blackScreen.classList.add('show');
-    fadeOutMusic(2000, bgMusic2);
+    fadeOutMusic(2000, bgMusic);
 
     setTimeout(() => {
       showStage('game1-stage');
@@ -1288,6 +1307,9 @@
   }
 
   function startGame2() {
+    // 按需加载：囚笼音乐 + 预加载中段视频
+    ensureMedia(prisonMusic, '.uploads/49db2c1e-5518-4b35-bbb3-cd119e4756fb_北北昼,北昼 - 囚笼.mp3');
+    ensureVideo('videoMidBlobUrl', MID_VIDEO);
     fadeToBlack(() => {
       showStage('game2-stage');
       document.getElementById('game2-overlay').style.display = 'none';
@@ -1418,7 +1440,6 @@
 
   // ================= 背景音乐控制 =================
   const bgMusic = document.getElementById('bgMusic');
-  const bgMusic2 = document.getElementById('bgMusic2');
   const musicToggle = document.getElementById('musicToggle');
 
   // 记录本次体验中播放过的歌曲
@@ -1427,17 +1448,15 @@
     if (name && !playedSongs.includes(name)) playedSongs.push(name);
   }
 
-  // 使用原始媒体地址，让浏览器按需流式加载背景音乐
-  bgMusic.src = 'frankenstein.mp3';
-  bgMusic2.src = 'bgm2.mp3';
+  // 背景音乐：frankenstein 立即加载
+  loadMediaBlob('frankenstein.mp3').then(u => { bgMusic.src = u; });
 
-  // 低音量（稍微调小）
+  // 低音量
   bgMusic.volume = 0.08;
-  bgMusic2.volume = 0.05;
 
   // 获取当前正在播放的音频
   function getActiveAudio() {
-    return !bgMusic2.paused ? bgMusic2 : bgMusic;
+    return bgMusic;
   }
 
   // 同步按钮图标与播放状态
@@ -1455,8 +1474,6 @@
   }
   bgMusic.addEventListener('play', updateMusicBtn);
   bgMusic.addEventListener('pause', updateMusicBtn);
-  bgMusic2.addEventListener('play', updateMusicBtn);
-  bgMusic2.addEventListener('pause', updateMusicBtn);
   updateMusicBtn();
 
   // 开关音乐
@@ -1473,38 +1490,34 @@
     }
   }
 
-  // 页面加载时尝试自动播放；被浏览器拦截时静音播放，首次交互后取消静音
+  // 优先有声自动播放；被浏览器拦截时，改为静音播放，首次交互后取消静音
   function tryAutoplay() {
-    let userInteracted = false;
-    const tryUnmute = (event) => {
-      userInteracted = true;
-      document.removeEventListener('pointerdown', tryUnmute, true);
-      document.removeEventListener('keydown', tryUnmute, true);
-      document.removeEventListener('touchstart', tryUnmute, true);
-      if (event.target instanceof Element && event.target.closest('#musicToggle')) return;
-
-      const active = getActiveAudio();
-      active.muted = false;
-      active.volume = active === bgMusic2 ? 0.05 : 0.08;
-      if (active.paused) {
-        active.play().then(() => {
-          if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
-        }).catch(e => console.warn("用户交互后播放音乐失败:", e));
-      }
-    };
-    document.addEventListener('pointerdown', tryUnmute, true);
-    document.addEventListener('keydown', tryUnmute, true);
-    document.addEventListener('touchstart', tryUnmute, true);
-
     bgMusic.play().then(() => {
       markPlayed('背景音乐 · Frankenstein');
+      console.log("音乐自动播放成功");
     }).catch(() => {
-      if (userInteracted) return;
       bgMusic.muted = true;
-      bgMusic.play().catch(e => console.warn("静音自动播放失败:", e));
+      bgMusic.play().catch(() => {});
+      const tryUnmute = () => {
+        const active = getActiveAudio();
+        active.muted = false;
+        active.volume = 0.08;
+        if (active.paused) active.play().catch(() => {});
+        document.removeEventListener('click', tryUnmute);
+        document.removeEventListener('keydown', tryUnmute);
+        document.removeEventListener('touchstart', tryUnmute);
+      };
+      document.addEventListener('click', tryUnmute);
+      document.addEventListener('keydown', tryUnmute);
+      document.addEventListener('touchstart', tryUnmute);
     });
   }
-  tryAutoplay();
+  // 等待 Blob URL 加载完成后再尝试播放
+  if (bgMusic.src && bgMusic.src.startsWith('blob:')) {
+    tryAutoplay();
+  } else {
+    bgMusic.addEventListener('loadedmetadata', tryAutoplay, { once: true });
+  }
 
   // ================= 礼物盒 + 搜索动画（三角洲风格） =================
   const SEARCH_CONFIGS = [
@@ -1624,21 +1637,6 @@
     }
   }
 
-  let confettiLoadPromise;
-  function loadConfetti() {
-    if (typeof confetti === 'function') return Promise.resolve();
-    if (!confettiLoadPromise) {
-      confettiLoadPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('烟花效果库加载失败'));
-        document.head.appendChild(script);
-      });
-    }
-    return confettiLoadPromise;
-  }
-
   function initFinalStage() {
     // 生成漂浮粒子
     const container = document.getElementById('finalParticles');
@@ -1659,9 +1657,9 @@
     }
     // 自动撒一轮轻量烟花
     setTimeout(() => {
-      loadConfetti().then(() => {
+      if (typeof confetti === 'function') {
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, zIndex: 11000 });
-      }).catch(e => console.warn(e.message));
+      }
     }, 400);
   }
 
