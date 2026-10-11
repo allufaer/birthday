@@ -677,7 +677,7 @@
 <div id="black-screen"></div>
 
 <!-- 全局背景音乐 —— 页面加载时自动播放；浏览器拦截有声播放时静音播放，首次交互后取消静音 -->
-<audio id="bgMusic" loop preload="none"></audio>
+<audio id="bgMusic" loop preload="auto" autoplay></audio>
 <audio id="bgMusic2" loop preload="none"></audio>
 <button class="music-toggle" id="musicToggle" onclick="toggleMusic()">🎵</button>
 
@@ -1473,25 +1473,38 @@
     }
   }
 
-  // 首次交互时再启动音乐，避免页面加载时下载整首背景音乐
-  function startMusicOnFirstInteraction(event) {
-    document.removeEventListener('pointerdown', startMusicOnFirstInteraction, true);
-    document.removeEventListener('keydown', startMusicOnFirstInteraction, true);
-    document.removeEventListener('touchstart', startMusicOnFirstInteraction, true);
-    if (event.target instanceof Element && event.target.closest('#musicToggle')) return;
+  // 页面加载时尝试自动播放；被浏览器拦截时静音播放，首次交互后取消静音
+  function tryAutoplay() {
+    let userInteracted = false;
+    const tryUnmute = (event) => {
+      userInteracted = true;
+      document.removeEventListener('pointerdown', tryUnmute, true);
+      document.removeEventListener('keydown', tryUnmute, true);
+      document.removeEventListener('touchstart', tryUnmute, true);
+      if (event.target instanceof Element && event.target.closest('#musicToggle')) return;
 
-    const active = getActiveAudio();
-    active.muted = false;
-    active.volume = active === bgMusic2 ? 0.05 : 0.08;
-    if (active.paused) {
-      active.play().then(() => {
-        if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
-      }).catch(e => console.warn("用户交互后播放音乐失败:", e));
-    }
+      const active = getActiveAudio();
+      active.muted = false;
+      active.volume = active === bgMusic2 ? 0.05 : 0.08;
+      if (active.paused) {
+        active.play().then(() => {
+          if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
+        }).catch(e => console.warn("用户交互后播放音乐失败:", e));
+      }
+    };
+    document.addEventListener('pointerdown', tryUnmute, true);
+    document.addEventListener('keydown', tryUnmute, true);
+    document.addEventListener('touchstart', tryUnmute, true);
+
+    bgMusic.play().then(() => {
+      markPlayed('背景音乐 · Frankenstein');
+    }).catch(() => {
+      if (userInteracted) return;
+      bgMusic.muted = true;
+      bgMusic.play().catch(e => console.warn("静音自动播放失败:", e));
+    });
   }
-  document.addEventListener('pointerdown', startMusicOnFirstInteraction, true);
-  document.addEventListener('keydown', startMusicOnFirstInteraction, true);
-  document.addEventListener('touchstart', startMusicOnFirstInteraction, true);
+  tryAutoplay();
 
   // ================= 礼物盒 + 搜索动画（三角洲风格） =================
   const SEARCH_CONFIGS = [
