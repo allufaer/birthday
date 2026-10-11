@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>奶蛙营救记 | 生日特别版</title>
-<!-- 引入烟花库 -->
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 <style>
   /* ================= 基础重置 ================= */
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Microsoft YaHei', sans-serif; user-select: none; }
@@ -679,14 +677,14 @@
 <div id="black-screen"></div>
 
 <!-- 全局背景音乐 —— 页面加载时自动播放；浏览器拦截有声播放时静音播放，首次交互后取消静音 -->
-<audio id="bgMusic" loop preload="auto" autoplay></audio>
-<audio id="bgMusic2" loop preload="auto"></audio>
+<audio id="bgMusic" loop preload="none"></audio>
+<audio id="bgMusic2" loop preload="none"></audio>
 <button class="music-toggle" id="musicToggle" onclick="toggleMusic()">🎵</button>
 
 <!-- 密码错误温馨弹窗 -->
 <div class="error-overlay" id="errorOverlay">
   <div class="error-card">
-    <img src="error-img.jpg" alt="温馨提示">
+    <img src="error-img.jpg" alt="温馨提示" loading="lazy">
     <div class="error-card-body">
       <h2>密码不对哦～</h2>
       <p>再想想今天是什么日子吧？<br>提示：月+日，4位数字<br>（比如1月1日就是 0101）</p>
@@ -749,14 +747,14 @@
 <!-- ================= 3. 视频1 ================= -->
 <div id="video1-stage" class="stage">
   <div class="video-container">
-    <video id="video1" playsinline controls muted preload="metadata"></video>
+    <video id="video1" playsinline controls muted preload="none"></video>
   </div>
 </div>
 
 <!-- ================= 4. 奶蛙开场剧情 ================= -->
 <div id="vn1-stage" class="stage">
   <div class="vn-background" style="background-image: url('bg1.jpg');"></div>
-  <img class="vn-character" src="character.png" alt="奶娃骑士">
+  <img class="vn-character" src="character.png" alt="奶娃骑士" loading="lazy">
   <div class="vn-dialog-box">
     <div class="vn-name-tag">奶娃骑士</div>
     <div class="vn-text">糟了！小白手套抓走了奶蛙！愿意和我一起营救吗？</div>
@@ -772,7 +770,7 @@
   <div class="game-header">🐕 请让大狗叫（连续点击5次！）</div>
   <!-- 大狗图片（外层为点击判定区，内层为圆形图片） -->
   <div id="dogHitbox">
-    <img id="dogImage" src="https://placehold.co/150x150/orange/white?text=大狗" alt="大狗" draggable="false">
+    <img id="dogImage" alt="大狗" draggable="false">
   </div>
   <!-- 屏幕变白遮罩 -->
   <div id="whiteOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #f5f5f5; opacity: 0; pointer-events: none; z-index: 100; transition: opacity 2s ease;"></div>
@@ -781,7 +779,7 @@
 <!-- ================= 6. 过渡剧情2（幻术与闪身步） ================= -->
 <div id="vn2-stage" class="stage">
   <div class="vn-background" style="background-image: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1920&auto=format&fit=crop');"></div>
-  <img class="vn-character" src="character.png" alt="奶娃骑士">
+  <img class="vn-character" src="character.png" alt="奶娃骑士" loading="lazy">
   <div class="vn-dialog-box" style="bottom: auto; top: 16%;">
     <div class="vn-name-tag">奶娃骑士</div>
     <div class="vn-text">小白手套设计了幻阵，我们得用闪身步，规矩立住，这样路才能走宽</div>
@@ -820,7 +818,7 @@
 <!-- ================= 7.6. 通关视频 ================= -->
 <div id="video-mid-stage" class="stage">
   <div class="video-container">
-    <video id="videoMid" playsinline controls muted preload="metadata"></video>
+    <video id="videoMid" playsinline controls muted preload="none"></video>
   </div>
 </div>
 
@@ -1470,37 +1468,25 @@
     }
   }
 
-  // 页面加载时优先有声自动播放；被浏览器拦截时改为静音播放，首次交互后取消静音
-  function tryAutoplay() {
-    let userInteracted = false;
-    const tryUnmute = () => {
-      userInteracted = true;
-      const active = getActiveAudio();
-      active.muted = false;
-      active.volume = active === bgMusic2 ? 0.05 : 0.08;
-      if (active.paused) {
-        active.play().then(() => {
-          if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
-        }).catch(e => console.warn("用户交互后播放音乐失败:", e));
-      }
-      document.removeEventListener('pointerdown', tryUnmute, true);
-      document.removeEventListener('keydown', tryUnmute, true);
-      document.removeEventListener('touchstart', tryUnmute, true);
-    };
-    document.addEventListener('pointerdown', tryUnmute, true);
-    document.addEventListener('keydown', tryUnmute, true);
-    document.addEventListener('touchstart', tryUnmute, true);
+  // 首次交互时再启动音乐，避免页面加载时下载整首背景音乐
+  function startMusicOnFirstInteraction(event) {
+    document.removeEventListener('pointerdown', startMusicOnFirstInteraction, true);
+    document.removeEventListener('keydown', startMusicOnFirstInteraction, true);
+    document.removeEventListener('touchstart', startMusicOnFirstInteraction, true);
+    if (event.target instanceof Element && event.target.closest('#musicToggle')) return;
 
-    bgMusic.play().then(() => {
-      markPlayed('背景音乐 · Frankenstein');
-      console.log("音乐自动播放成功");
-    }).catch(() => {
-      if (userInteracted) return;
-      bgMusic.muted = true;
-      bgMusic.play().catch(e => console.warn("静音自动播放失败:", e));
-    });
+    const active = getActiveAudio();
+    active.muted = false;
+    active.volume = active === bgMusic2 ? 0.05 : 0.08;
+    if (active.paused) {
+      active.play().then(() => {
+        if (active === bgMusic) markPlayed('背景音乐 · Frankenstein');
+      }).catch(e => console.warn("用户交互后播放音乐失败:", e));
+    }
   }
-  tryAutoplay();
+  document.addEventListener('pointerdown', startMusicOnFirstInteraction, true);
+  document.addEventListener('keydown', startMusicOnFirstInteraction, true);
+  document.addEventListener('touchstart', startMusicOnFirstInteraction, true);
 
   // ================= 礼物盒 + 搜索动画（三角洲风格） =================
   const SEARCH_CONFIGS = [
@@ -1620,6 +1606,21 @@
     }
   }
 
+  let confettiLoadPromise;
+  function loadConfetti() {
+    if (typeof confetti === 'function') return Promise.resolve();
+    if (!confettiLoadPromise) {
+      confettiLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('烟花效果库加载失败'));
+        document.head.appendChild(script);
+      });
+    }
+    return confettiLoadPromise;
+  }
+
   function initFinalStage() {
     // 生成漂浮粒子
     const container = document.getElementById('finalParticles');
@@ -1640,9 +1641,9 @@
     }
     // 自动撒一轮轻量烟花
     setTimeout(() => {
-      if (typeof confetti === 'function') {
+      loadConfetti().then(() => {
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 }, zIndex: 11000 });
-      }
+      }).catch(e => console.warn(e.message));
     }, 400);
   }
 
